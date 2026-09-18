@@ -94,6 +94,10 @@ else:
 # Marcador de éxito
 # -----------------------------------------------------------------------------
 
+with open(f"{OUTPUT_FOLDER}/part-00000", "w", encoding="utf-8") as f:
+    for key, value in result:
+        f.write(f"{key}\t{value}\n")
+
 with open(f"{OUTPUT_FOLDER}/_SUCCESS", "w", encoding="utf-8") as f:
     f.write("")
 
