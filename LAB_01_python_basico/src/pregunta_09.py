@@ -1,12 +1,14 @@
+import pandas as pd
+import os
+
 def pregunta_09():
-    """
-    Cuente cuántas veces aparece cada clave en la quinta columna (`metrics`)
-    de todo el archivo. Retorne un diccionario `{clave: cantidad}` con las
-    claves en orden alfabético.
-
-    Ejemplo del formato de la respuesta:
-
-        {"aaa": 13, "bbb": 16, "ccc": 23, ...}
-    """
-
-    raise NotImplementedError
+    data = pd.read_csv(
+        os.path.join(os.path.dirname(__file__), '..', 'data', 'data.csv.gz'),
+        compression='gzip',
+        sep='\t',
+        header=None,
+        names=['letter', 'value', 'date', 'codes', 'metrics'],
+    )
+    claves = data['metrics'].str.split(',').explode().str.split(':').str[0]
+    conteo = claves.value_counts().sort_index()
+    return {clave: int(n) for clave, n in conteo.items()}

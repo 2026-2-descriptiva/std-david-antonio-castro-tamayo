@@ -1,16 +1,16 @@
+import pandas as pd
+import os
+
 def pregunta_06():
-    """
-    La quinta columna (`metrics`) contiene pares `clave:valor` separados por
-    comas. Para cada clave, encuentre el valor mínimo y el valor máximo que
-    aparecen en todo el archivo. Retorne una lista de tuplas
-    `(clave, mínimo, máximo)` ordenada alfabéticamente por la clave.
-
-    Observe que el orden es mínimo y luego máximo, al contrario de la
-    pregunta 5.
-
-    Ejemplo del formato de la respuesta:
-
-        [("aaa", 1, 9), ("bbb", 1, 9), ...]
-    """
-
-    raise NotImplementedError
+    data = pd.read_csv(
+        os.path.join(os.path.dirname(__file__), '..', 'data', 'data.csv.gz'),
+        compression='gzip',
+        sep='\t',
+        header=None,
+        names=['letter', 'value', 'date', 'letters', 'metrics'],
+    )
+    pares = data['metrics'].str.split(',').explode().str.split(':', expand=True)
+    pares.columns = ['clave', 'valor']
+    pares['valor'] = pares['valor'].astype(int)
+    res = pares.groupby('clave')['valor'].agg(['min', 'max'])
+    return [(clave, int(fila['min']), int(fila['max'])) for clave, fila in res.iterrows()]

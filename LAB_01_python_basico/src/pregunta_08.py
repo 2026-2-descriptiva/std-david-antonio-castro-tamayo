@@ -1,12 +1,13 @@
+import pandas as pd
+import os
+
 def pregunta_08():
-    """
-    Repita la pregunta 7, pero ahora cada lista de letras debe contener cada
-    letra una sola vez y estar ordenada alfabéticamente. Retorne una lista de
-    tuplas `(valor, letras)` ordenada por el valor.
-
-    Ejemplo del formato de la respuesta:
-
-        [(0, ["C"]), (1, ["B", "E"]), (2, ["A", "E"]), ...]
-    """
-
-    raise NotImplementedError
+    data = pd.read_csv(
+        os.path.join(os.path.dirname(__file__), '..', 'data', 'data.csv.gz'),
+        compression='gzip',
+        sep='\t',
+        header=None,
+        names=['letter', 'value', 'date', 'codes', 'metrics'],
+    )
+    res = data.groupby('value')['letter'].apply(lambda s: sorted(set(s)))
+    return [(int(valor), letras) for valor, letras in res.items()]

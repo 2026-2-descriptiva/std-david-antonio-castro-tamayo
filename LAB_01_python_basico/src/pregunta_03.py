@@ -1,12 +1,13 @@
+import pandas as pd
+import os
+
 def pregunta_03():
-    """
-    Sume los valores de la segunda columna (`value`) para cada letra de la
-    primera columna (`letter`). Retorne una lista de tuplas `(letra, suma)`
-    ordenada alfabéticamente por la letra.
-
-    Ejemplo del formato de la respuesta:
-
-        [("A", 53), ("B", 36), ("C", 27), ...]
-    """
-
-    raise NotImplementedError
+    data = pd.read_csv(
+        os.path.join(os.path.dirname(__file__), '..', 'data', 'data.csv.gz'),
+        compression='gzip',
+        sep='\t',
+        header=None,
+        names=['letter', 'value', 'date', 'letters', 'pairs'],
+    )
+    suma = data.groupby('letter')['value'].sum()
+    return [(letra, int(total)) for letra, total in suma.items()]

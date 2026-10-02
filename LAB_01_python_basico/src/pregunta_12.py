@@ -1,12 +1,17 @@
+import pandas as pd
+import os
+
 def pregunta_12():
-    """
-    Para cada letra de la primera columna (`letter`), sume todos los valores
-    numéricos de los pares `clave:valor` de la quinta columna (`metrics`).
-    Retorne un diccionario `{letra: suma}` con las letras en orden alfabético.
-
-    Ejemplo del formato de la respuesta:
-
-        {"A": 177, "B": 187, "C": 114, ...}
-    """
-
-    raise NotImplementedError
+    data = pd.read_csv(
+        os.path.join(os.path.dirname(__file__), '..', 'data', 'data.csv.gz'),
+        compression='gzip',
+        sep='\t',
+        header=None,
+        names=['letter', 'value', 'date', 'codes', 'metrics'],
+    )
+    df = data[['letter', 'metrics']].copy()
+    df['metrics'] = df['metrics'].str.split(',')
+    df = df.explode('metrics')
+    df['num'] = df['metrics'].str.split(':').str[1].astype(int)
+    suma = df.groupby('letter')['num'].sum()
+    return {letra: int(total) for letra, total in suma.items()}
