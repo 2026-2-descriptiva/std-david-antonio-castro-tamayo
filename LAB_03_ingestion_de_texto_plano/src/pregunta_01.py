@@ -26,4 +26,41 @@ def pregunta_01():
         ...
     """
 
-    raise NotImplementedError
+    import os
+    import re
+    import pandas as pd
+
+    ruta = os.path.join(
+        os.path.dirname(__file__), '..', 'data', 'clusters_report.txt'
+    )
+
+    patron = re.compile(r"^(\d+)\s+(\d+)\s+(\d+(?:[.,]\d+)?)\s*%\s*(.*)$")
+
+    registros = []
+    actual = None
+
+    with open(ruta, encoding="utf-8") as archivo:
+        for linea in archivo:
+            linea = linea.strip()
+            coincidencia = patron.match(linea)
+
+            if coincidencia:
+                actual = {
+                    "cluster": int(coincidencia.group(1)),
+                    "cantidad_de_palabras_clave": int(coincidencia.group(2)),
+                    "porcentaje_de_palabras_clave": float(
+                        coincidencia.group(3).replace(",", ".")
+                    ),
+                    "texto": [coincidencia.group(4)],
+                }
+                registros.append(actual)
+            elif actual is not None and linea and not set(linea) <= set("-= "):
+                actual["texto"].append(linea)
+
+    for registro in registros:
+        texto = " ".join(registro.pop("texto"))
+        texto = re.sub(r"\s+", " ", texto).strip().rstrip(".")
+        palabras = [p.strip() for p in texto.split(",") if p.strip()]
+        registro["principales_palabras_clave"] = ", ".join(palabras)
+
+    return pd.DataFrame(registros)

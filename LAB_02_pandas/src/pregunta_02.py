@@ -8,4 +8,9 @@ def pregunta_02():
         4
     """
 
-    raise NotImplementedError
+    import pandas as pd
+    import os
+    data = pd.read_csv(os.path.join(os.path.dirname(__file__), '..', 'data', 'tbl0.tsv'), sep="\t")
+    columnas = len(data.columns)
+    
+    return columnas

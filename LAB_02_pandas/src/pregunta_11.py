@@ -5,14 +5,18 @@ def pregunta_11():
     una fila por cada valor de `c0`, en orden ascendente, y las columnas `c0`
     y `c4`. En `c4`, escriba las letras de ese `c0` ordenadas alfabéticamente
     y separadas por comas.
-
-    Ejemplo del formato de la respuesta:
-
-            c0       c4
-        0    0    b,f,g
-        1    1    a,c,f
-        2    2  a,c,e,f
-        ...
     """
 
-    raise NotImplementedError
+    import pandas as pd
+    import os
+
+    data = pd.read_csv(
+        os.path.join(os.path.dirname(__file__), '..', 'data', 'tbl1.tsv'),
+        sep="\t",
+    )
+
+    return (
+        data.groupby("c0")["c4"]
+        .apply(lambda x: ",".join(sorted(x)))
+        .reset_index()
+    )
