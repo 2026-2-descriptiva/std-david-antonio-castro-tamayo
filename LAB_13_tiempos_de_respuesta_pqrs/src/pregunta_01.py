@@ -1,5 +1,16 @@
+import gzip
+import os
+
+import numpy as np
 import pandas as pd
 
+def _leer(ruta):
+    with gzip.open(ruta, "rt", encoding="utf-8-sig") as f:
+        encabezado = f.readline()
+    sep = ";" if encabezado.count(";") > encabezado.count(",") else ","
+    df = pd.read_csv(ruta, sep=sep, encoding="utf-8-sig")
+    df.columns = [c.strip() for c in df.columns]
+    return df
 
 def pregunta_01() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """
@@ -61,4 +72,88 @@ def pregunta_01() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
         ...
     """
 
-    raise NotImplementedError
+    base = os.path.join(os.path.dirname(__file__), '..')
+    data = os.path.join(base, 'data')
+
+    partes = []
+    for canal, archivo in [
+        ("letter", "historical_requests_letter.csv.gz"),
+        ("web", "historical_requests_web.csv.gz"),
+    ]:
+        d = _leer(os.path.join(data, archivo)).drop_duplicates()
+        d["channel"] = canal
+        partes.append(d)
+    df = pd.concat(partes, ignore_index=True)
+
+    df["in_date"] = pd.to_datetime(df["in_date"], errors="coerce").dt.normalize()
+    df["out_date"] = pd.to_datetime(df["out_date"], errors="coerce").dt.normalize()
+
+    df["year"] = df["in_date"].dt.year
+    df["answered"] = df["out_date"].notna()
+
+    df["calendar_days"] = (df["out_date"] - df["in_date"]).dt.days
+
+    df["business_days"] = np.nan
+    r = df["answered"] & df["in_date"].notna()
+    uno = np.timedelta64(1, "D")
+    inicio = df.loc[r, "in_date"].values.astype("datetime64[D]") + uno
+    fin = df.loc[r, "out_date"].values.astype("datetime64[D]") + uno
+    df.loc[r, "business_days"] = np.busday_count(inicio, fin)
+
+    df["on_time"] = df["answered"] & (df["business_days"] <= 15)
+
+    channel = (
+        df.groupby("channel")
+        .agg(
+            requests=("channel", "size"),
+            answered=("answered", "sum"),
+            median_business_days=("business_days", "median"),
+            on_time_rate=("on_time", "mean"),
+        )
+        .reset_index()
+    )
+    channel["pending"] = channel["requests"] - channel["answered"]
+    channel = channel[
+        ["channel", "requests", "answered", "pending",
+         "median_business_days", "on_time_rate"]
+    ]
+
+    yearly = (
+        df.groupby(["year", "channel"])
+        .agg(
+            requests=("channel", "size"),
+            answered=("answered", "sum"),
+            on_time_rate=("on_time", "mean"),
+        )
+        .reset_index()
+    )
+    yearly["pending"] = yearly["requests"] - yearly["answered"]
+    yearly["year"] = yearly["year"].astype(int)
+    yearly = yearly.sort_values(["year", "channel"]).reset_index(drop=True)[
+        ["year", "channel", "requests", "pending", "on_time_rate"]
+    ]
+
+    df["_dow"] = df["in_date"].dt.dayofweek
+    dias = (
+        df.groupby("day_name")
+        .agg(
+            requests=("day_name", "size"),
+            median_calendar_days=("calendar_days", "median"),
+            median_business_days=("business_days", "median"),
+            _dow=("_dow", "min"),
+        )
+        .reset_index()
+        .sort_values("_dow")
+        .reset_index(drop=True)[
+            ["day_name", "requests", "median_calendar_days",
+             "median_business_days"]
+        ]
+    )
+
+    salida = os.path.join(base, 'submission')
+    os.makedirs(salida, exist_ok=True)
+    channel.to_csv(os.path.join(salida, 'channel_summary.csv'), index=False)
+    yearly.to_csv(os.path.join(salida, 'yearly_summary.csv'), index=False)
+    dias.to_csv(os.path.join(salida, 'entry_day_summary.csv'), index=False)
+
+    return channel, yearly, dias

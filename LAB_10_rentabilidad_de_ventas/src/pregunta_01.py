@@ -1,5 +1,5 @@
 import pandas as pd
-
+import os
 
 def pregunta_01() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """
@@ -50,4 +50,85 @@ def pregunta_01() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
         ...
     """
 
-    raise NotImplementedError
+    base = os.path.join(os.path.dirname(__file__), '..')
+    df = pd.read_csv(
+      os.path.join(base, 'data', 'superstore_orders.csv.gz'),
+      sep=";",
+      decimal=",",
+      encoding="utf-8-sig",
+    )
+    df.columns = [c.strip() for c in df.columns]
+
+
+    df["is_loss"] = df["Profit"] < 0
+    df["loss"] = (-df["Profit"]).where(df["is_loss"], 0.0)
+
+    df["discount_band"] = pd.cut(
+        df["Discount"],
+        bins=[float("-inf"), 0, 0.05, 0.10, float("inf")],
+        labels=["0%", "1%-5%", "6%-10%", "más de 10%"],
+    )
+
+    def agregar(grupos, con_pedidos=False):
+        """Calcula las métricas comunes y las redondea."""
+        reglas = dict(
+            lines=("Order ID", "size"),
+            sales=("Sales", "sum"),
+            profit=("Profit", "sum"),
+            loss_lines=("is_loss", "sum"),
+            lost_profit=("loss", "sum"),
+        )
+        if con_pedidos:
+            reglas["orders"] = ("Order ID", "nunique")
+
+        r = grupos.agg(**reglas)
+        r["profit_margin"] = r["profit"] / r["sales"]
+        r["loss_line_rate"] = r["loss_lines"] / r["lines"]
+
+        r["sales"] = r["sales"].round(2)
+        r["profit"] = r["profit"].round(4)
+        r["lost_profit"] = r["lost_profit"].round(4)
+        r["profit_margin"] = r["profit_margin"].round(4)
+        r["loss_line_rate"] = r["loss_line_rate"].round(4)
+        return r
+
+    resumen = agregar(df.assign(_k=1).groupby("_k"), con_pedidos=True)
+    profitability = resumen.reset_index(drop=True)[
+        ["lines", "orders", "sales", "profit", "profit_margin",
+         "loss_lines", "loss_line_rate", "lost_profit"]
+    ]
+
+    discount = agregar(
+        df.groupby("discount_band", observed=False)
+    ).reset_index()[
+        ["discount_band", "lines", "sales", "profit", "profit_margin",
+         "loss_line_rate", "lost_profit"]
+    ]
+    discount["discount_band"] = discount["discount_band"].astype(str)
+
+    por_segmento = agregar(
+        df.groupby(["Customer Segment", "Product Category"])
+    ).reset_index()
+    priority = (
+        por_segmento[por_segmento["lines"] >= 100]
+        .sort_values("lost_profit", ascending=False)
+        .head(5)
+        .reset_index(drop=True)[
+            ["Customer Segment", "Product Category", "lines", "sales",
+             "profit", "profit_margin", "lost_profit"]
+        ]
+    )
+
+    salida = os.path.join(base, 'submission')
+    os.makedirs(salida, exist_ok=True)
+    profitability.to_csv(
+        os.path.join(salida, 'profitability_summary.csv'), index=False
+    )
+    discount.to_csv(
+        os.path.join(salida, 'discount_summary.csv'), index=False
+    )
+    priority.to_csv(
+        os.path.join(salida, 'priority_segments.csv'), index=False
+    )
+
+    return profitability, discount, priority

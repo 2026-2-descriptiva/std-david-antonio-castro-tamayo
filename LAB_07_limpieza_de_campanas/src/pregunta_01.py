@@ -1,3 +1,6 @@
+import glob
+import os
+
 import pandas as pd
 
 
@@ -43,4 +46,63 @@ def clean_campaign_data() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
         ...
     """
 
-    raise NotImplementedError
+    base = os.path.join(os.path.dirname(__file__), '..')
+    patron = os.path.join(base, 'data', 'bank-marketing-campaing-*.csv.gz')
+
+    archivos = sorted(glob.glob(patron))
+    df = pd.concat(
+        [pd.read_csv(a, compression="gzip") for a in archivos],
+        ignore_index=True,
+    )
+
+    client = df[
+        ["client_id", "age", "job", "marital", "education",
+         "credit_default", "mortgage"]
+    ].copy()
+
+    client["job"] = (
+        client["job"]
+        .str.replace(".", "", regex=False)
+        .str.replace("-", "_", regex=False)
+    )
+    client["education"] = client["education"].str.replace(
+        ".", "_", regex=False
+    )
+    client["education"] = client["education"].replace("unknown", pd.NA)
+    client["credit_default"] = (client["credit_default"] == "yes").astype(int)
+    client["mortgage"] = (client["mortgage"] == "yes").astype(int)
+
+    campaign = df[
+        ["client_id", "number_contacts", "contact_duration",
+         "previous_campaign_contacts", "previous_outcome",
+         "campaign_outcome"]
+    ].copy()
+
+    campaign["previous_outcome"] = (
+        campaign["previous_outcome"] == "success"
+    ).astype(int)
+    campaign["campaign_outcome"] = (
+        campaign["campaign_outcome"] == "yes"
+    ).astype(int)
+
+    meses = {
+        "jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "jun": 6,
+        "jul": 7, "aug": 8, "sep": 9, "oct": 10, "nov": 11, "dec": 12,
+    }
+    mes = df["month"].str.strip().str.lower().str[:3].map(meses)
+    fecha = pd.to_datetime(
+        {"year": 2022, "month": mes, "day": df["day"]}
+    )
+    campaign["last_contact_date"] = fecha.dt.strftime("%Y-%m-%d")
+
+    economics = df[
+        ["client_id", "cons_price_idx", "euribor_three_months"]
+    ].copy()
+
+    salida = os.path.join(base, 'submission')
+    os.makedirs(salida, exist_ok=True)
+    client.to_csv(os.path.join(salida, 'client.csv'), index=False)
+    campaign.to_csv(os.path.join(salida, 'campaign.csv'), index=False)
+    economics.to_csv(os.path.join(salida, 'economics.csv'), index=False)
+
+    return client, campaign, economics
